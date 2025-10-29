@@ -1,44 +1,53 @@
-name: Build & Release (Linux .deb)
+name: Build & Release (Linux)
 
 on:
   push:
     tags:
-      - "v*"  # z.B. v1.0.1
+      - "v*"
 
 permissions:
-  contents: write  # erlaubt Upload an Release
+  contents: write  # erlaubt Release-Upload
 
 jobs:
   build-linux:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node (LTS)
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
 
-      - name: Install system deps (AppImage runtime, optional)
+      - name: Install system deps (AppImage runtime optional)
         run: |
           sudo apt-get update
           sudo apt-get install -y libfuse2 || true
 
-      - name: Install deps
+      - name: Install dependencies
         run: npm ci
 
-      # Baue .deb (und optional AppImage – Zeile drunter auskommentieren)
-      - name: Build
-        run: npx electron-builder --linux deb
-        # run: npx electron-builder --linux deb AppImage
+      # electron-builder nur bauen lassen, NICHT publishen
+      - name: Build artifacts (.deb + AppImage)
+        run: npx electron-builder --linux deb AppImage --publish never
 
-      - name: Upload artifacts to GitHub Release
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum *.deb  > SHA256SUMS.txt || true
+          sha256sum *.AppImage >> SHA256SUMS.txt || true
+          ls -lh
+
+      - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/*.deb
             dist/*.AppImage
+            dist/SHA256SUMS.txt
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

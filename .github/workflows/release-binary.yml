@@ -1,4 +1,4 @@
-name: Release binary (.deb)
+name: Release binary (.deb) — atomic
 
 on:
   push:
@@ -6,120 +6,59 @@ on:
       - "v*"
 
 permissions:
-  contents: write  # Releases: lesen/loeschen/erstellen/upload
+  contents: write  # Releases erstellen/löschen
 
 concurrency:
   group: release-${{ github.ref_name }}
   cancel-in-progress: false
 
 jobs:
-  build-deb:
+  build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node (LTS)
+      - name: Setup Node 20 (LTS)
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
 
-      - name: Install dependencies
+      - name: Install deps
         run: npm ci
 
-      - name: Build .deb (no publish)
+      # Build only (kein auto-publish von electron-builder)
+      - name: Build .deb
         run: npx electron-builder --linux deb --publish never
 
-      - name: Generate checksums
+      - name: Checksums
         run: |
           cd dist
           sha256sum *.deb > SHA256SUMS.txt
           ls -lh
 
-      - name: Compute artifact names
+      - name: Compute vars
         run: |
           echo "TAG=${GITHUB_REF_NAME}" >> $GITHUB_ENV
-          echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
           echo "DEB_PATH=$(echo dist/*.deb)" >> $GITHUB_ENV
           echo "DEB_NAME=$(basename dist/*.deb)" >> $GITHUB_ENV
-          echo "Computed: TAG=$GITHUB_REF_NAME VERSION=${GITHUB_REF_NAME#v} DEB_NAME=$(basename dist/*.deb)"
+          echo "TAG=$GITHUB_REF_NAME  DEB=$(basename dist/*.deb)"
 
-      - name: Debug current releases/tags
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh --version
-          echo "== Releases list (names & tags) =="
-          gh release list --limit 50 || true
-          echo "== Show release by current tag =="
-          gh release view "$TAG" || true
-          echo "== Current ref/tag =="
-          echo "$GITHUB_REF"
-
-      # 1a) Versuch: bestehenden Release per gh loeschen (idempotent)
-      - name: Delete existing release via gh (if any)
+      # Falls ein Release mit dem Tag schon existiert (immutable) -> weg damit
+      - name: Delete release if exists
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release view "$TAG" >/dev/null 2>&1 && gh release delete "$TAG" -y || true
 
-      # 1b) Backup: falls gh scheitert, per API sicher loeschen
-      - name: Delete existing release via API (backup)
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const tag = process.env.TAG || context.ref.replace('refs/tags/','');
-            const { owner, repo } = context.repo;
-            try {
-              const rel = await github.rest.repos.getReleaseByTag({ owner, repo, tag });
-              await github.rest.repos.deleteRelease({ owner, repo, release_id: rel.data.id });
-              core.info(`Deleted existing release ${tag} via API (id=${rel.data.id}).`);
-            } catch (e) {
-              if (e.status === 404) {
-                core.info(`No existing release for ${tag} (API).`);
-              } else {
-                throw e;
-              }
-            }
-
-      # 2) Frischen (published) Release fuer den Tag erzeugen
-      - name: Create published release
-        id: create_release
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const tag = process.env.TAG || context.ref.replace('refs/tags/','');
-            const { owner, repo } = context.repo;
-            const rel = await github.rest.repos.createRelease({
-              owner, repo,
-              tag_name: tag,
-              name: tag,
-              draft: false,
-              prerelease: false,
-              generate_release_notes: true
-            });
-            core.setOutput('upload_url', rel.data.upload_url);
-            core.info(`Created release ${tag} (id=${rel.data.id}).`);
-
-      # 3) Assets hochladen
-      - name: Upload .deb
-        uses: actions/upload-release-asset@v1
+      # ATOMAR: Release erstellen UND Dateien sofort anhängen (keine späteren Uploads)
+      - name: Create published release WITH assets (atomic)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ env.DEB_PATH }}
-          asset_name: ${{ env.DEB_NAME }}
-          asset_content_type: application/vnd.debian.binary-package
-
-      - name: Upload checksums
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/SHA256SUMS.txt
-          asset_name: SHA256SUMS.txt
-          asset_content_type: text/plain
+        run: |
+          gh release create "$TAG" \
+            "$DEB_PATH" dist/SHA256SUMS.txt \
+            --title "$TAG" \
+            --generate-notes \
+            --latest

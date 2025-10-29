@@ -1,6 +1,6 @@
 {
   "name": "ms-todo",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Rahmenloser Electron-Wrapper (always-on-top) für Microsoft To Do: https://to-do.live.com/tasks/today",
   "main": "main.js",
   "type": "module",
@@ -35,8 +35,11 @@
     ],
     "linux": {
       "category": "Utility",
-      "icon": "build/icons",          
-      "target": ["AppImage", "deb"],
+      "icon": "build/icons",
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "maintainer": "Leon Kitzbichler <lkitzbichler.development@outlook.com>"
     },
     "deb": {

@@ -1,20 +1,46 @@
 name: Release binary (.deb)
+
 on:
   push:
-    tags: ["v*"]
+    tags:
+      - "v*"    # z.B. v1.0.3
+
 permissions:
-  contents: write
+  contents: write  # erlaubt Upload an Releases
+
 jobs:
   build-deb:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: "20", cache: "npm" }
-      - run: npm ci
-      - run: npx electron-builder --linux deb
-      - uses: softprops/action-gh-release@v2
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node (LTS)
+        uses: actions/setup-node@v4
         with:
-          files: dist/*.deb
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      # WICHTIG: electron-builder darf NICHT publishen -> --publish never
+      - name: Build .deb
+        run: npx electron-builder --linux deb --publish never
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum *.deb > SHA256SUMS.txt
+          ls -lh
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.deb
+            dist/SHA256SUMS.txt
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

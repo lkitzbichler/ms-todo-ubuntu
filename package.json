@@ -1,0 +1,51 @@
+{
+  "name": "ms-todo",
+  "version": "1.0.0",
+  "description": "Rahmenloser Electron-Wrapper (always-on-top) für Microsoft To Do: https://to-do.live.com/tasks/today",
+  "main": "main.js",
+  "type": "module",
+  "scripts": {
+    "start": "ELECTRON_OZONE_PLATFORM_HINT=auto electron .",
+    "build": "electron-builder --linux AppImage deb"
+  },
+  "keywords": [
+    "electron",
+    "kiosk",
+    "todo",
+    "microsoft-to-do",
+    "always-on-top",
+    "browserview"
+  ],
+  "author": {
+    "name": "Leon Kitzbichler",
+    "email": "lkitzbichler.development@outlook.com"
+  },
+  "homepage": "https://example.com/ms-todo",
+  "license": "ISC",
+  "build": {
+    "appId": "com.leon.todo",
+    "productName": "TODO",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!dist/**",
+      "!node_modules/.cache/**"
+    ],
+    "linux": {
+      "category": "Utility",
+      "icon": "build/icons",          
+      "target": ["AppImage", "deb"],
+      "maintainer": "Leon Kitzbichler <lkitzbichler.development@outlook.com>"
+    },
+    "deb": {
+      "synopsis": "Microsoft To Do im rahmenlosen Fenster",
+      "description": "Electron-App mit BrowserView, die https://to-do.live.com/tasks/today im eigenen, always-on-top Fenster öffnet. Cookies/Logins bleiben über den userData-Pfad persistent."
+    }
+  },
+  "devDependencies": {
+    "electron": "^38.4.0",
+    "electron-builder": "^26.0.12"
+  }
+}

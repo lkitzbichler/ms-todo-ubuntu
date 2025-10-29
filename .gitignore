@@ -1,0 +1,40 @@
+# Node/Electron
+node_modules/
+npm-debug.log*
+yarn-*.log*
+pnpm-debug.log*
+.eslintcache
+
+# Builds/Artefakte
+dist/
+out/
+release/
+*.asar
+
+# Installer/Bundles
+*.AppImage
+*.deb
+*.rpm
+*.snap
+*.dmg
+*.exe
+*.zip
+*.tar.gz
+squashfs-root/
+
+# Env/Secrets
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+.idea/
+*.iml
+
+# OS-Trash
+.DS_Store
+Thumbs.db

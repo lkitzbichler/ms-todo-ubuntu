@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=TODO
+Comment=Microsoft To Do im rahmenlosen Fenster
+Exec=/PFAD/zu/TODO  %U
+Icon=todo
+Terminal=false
+Categories=Network;Utility;
+StartupNotify=true

@@ -1,0 +1,21 @@
+# Icon ins User-Icon-Theme
+mkdir -p ~/.local/share/icons/hicolor/256x256/apps
+cp //ms-todo/assets/favicon.png \
+   ~/.local/share/icons/hicolor/256x256/apps/todo.png
+gtk-update-icon-cache ~/.local/share/icons/hicolor 2>/dev/null || true
+
+# .desktop anlegen
+cat > ~/.local/share/applications/TODO.desktop << 'EOF'
+[Desktop Entry]
+Type=Application
+Name=TODO
+Comment=Microsoft To Do in eigenem rahmenlosen Fenster
+Exec=env ELECTRON_OZONE_PLATFORM_HINT=auto /usr/bin/npm start --prefix /ABSOLUTER/PFAD/zu/ms-todo
+Icon=todo
+Terminal=false
+Categories=Network;Utility;
+StartupNotify=true
+EOF
+
+chmod +x ~/.local/share/applications/TODO.desktop
+update-desktop-database ~/.local/share/applications 2>/dev/null || true

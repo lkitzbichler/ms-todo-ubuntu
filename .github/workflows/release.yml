@@ -6,7 +6,7 @@ on:
       - "v*"
 
 permissions:
-  contents: write  # erlaubt Release-Upload
+  contents: write  # erlaubt Upload an Releases
 
 jobs:
   build-linux:
@@ -22,7 +22,8 @@ jobs:
           node-version: "20"
           cache: "npm"
 
-      - name: Install system deps (AppImage runtime optional)
+      # Optional: nur nötig, wenn du AppImage zusätzlich baust
+      - name: Install system deps (AppImage runtime)
         run: |
           sudo apt-get update
           sudo apt-get install -y libfuse2 || true
@@ -30,9 +31,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # electron-builder nur bauen lassen, NICHT publishen
+      # WICHTIG: electron-builder darf NICHT publishen → --publish never
       - name: Build artifacts (.deb + AppImage)
         run: npx electron-builder --linux deb AppImage --publish never
+        # Falls du KEIN AppImage willst, nimm:
+        # run: npx electron-builder --linux deb --publish never
 
       - name: Generate checksums
         run: |

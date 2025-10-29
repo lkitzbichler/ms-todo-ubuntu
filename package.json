@@ -1,6 +1,6 @@
 {
   "name": "ms-todo",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Rahmenloser Electron-Wrapper (always-on-top) für Microsoft To Do: https://to-do.live.com/tasks/today",
   "main": "main.js",
   "type": "module",

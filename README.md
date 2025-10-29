@@ -1,5 +1,5 @@
 ## Install (Ubuntu/Debian)
-Download the latest `.deb` from the [Releases](./releases) page and run:
+Download the latest `.deb` from the [Releases](../../releases) page and run:
 ```bash
 sudo apt install -y ./ms-todo_1.x.x_amd64.deb
 

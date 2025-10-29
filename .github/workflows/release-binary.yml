@@ -3,10 +3,10 @@ name: Release binary (.deb)
 on:
   push:
     tags:
-      - "v*"    # z.B. v1.0.11
+      - "v*"
 
 permissions:
-  contents: write  # nötig für Release-Create/Delete/Upload
+  contents: write  # Releases: lesen/loeschen/erstellen/upload
 
 concurrency:
   group: release-${{ github.ref_name }}
@@ -29,8 +29,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # electron-builder baut, published NICHT selbst
-      - name: Build .deb
+      - name: Build .deb (no publish)
         run: npx electron-builder --linux deb --publish never
 
       - name: Generate checksums
@@ -47,30 +46,80 @@ jobs:
           echo "DEB_NAME=$(basename dist/*.deb)" >> $GITHUB_ENV
           echo "Computed: TAG=$GITHUB_REF_NAME VERSION=${GITHUB_REF_NAME#v} DEB_NAME=$(basename dist/*.deb)"
 
-      # --- WICHTIG: bestehenden Release mit gleichem Tag löschen (falls vorhanden), dann frisch erstellen ---
-      - name: Delete existing release (if any)
+      - name: Debug current releases/tags
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh --version
+          echo "== Releases list (names & tags) =="
+          gh release list --limit 50 || true
+          echo "== Show release by current tag =="
+          gh release view "$TAG" || true
+          echo "== Current ref/tag =="
+          echo "$GITHUB_REF"
+
+      # 1a) Versuch: bestehenden Release per gh loeschen (idempotent)
+      - name: Delete existing release via gh (if any)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release view "$TAG" >/dev/null 2>&1 && gh release delete "$TAG" -y || true
 
-      - name: Create published release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release create "$TAG" \
-            --title "$TAG" \
-            --generate-notes \
-            --latest
+      # 1b) Backup: falls gh scheitert, per API sicher loeschen
+      - name: Delete existing release via API (backup)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = process.env.TAG || context.ref.replace('refs/tags/','');
+            const { owner, repo } = context.repo;
+            try {
+              const rel = await github.rest.repos.getReleaseByTag({ owner, repo, tag });
+              await github.rest.repos.deleteRelease({ owner, repo, release_id: rel.data.id });
+              core.info(`Deleted existing release ${tag} via API (id=${rel.data.id}).`);
+            } catch (e) {
+              if (e.status === 404) {
+                core.info(`No existing release for ${tag} (API).`);
+              } else {
+                throw e;
+              }
+            }
 
+      # 2) Frischen (published) Release fuer den Tag erzeugen
+      - name: Create published release
+        id: create_release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = process.env.TAG || context.ref.replace('refs/tags/','');
+            const { owner, repo } = context.repo;
+            const rel = await github.rest.repos.createRelease({
+              owner, repo,
+              tag_name: tag,
+              name: tag,
+              draft: false,
+              prerelease: false,
+              generate_release_notes: true
+            });
+            core.setOutput('upload_url', rel.data.upload_url);
+            core.info(`Created release ${tag} (id=${rel.data.id}).`);
+
+      # 3) Assets hochladen
       - name: Upload .deb
+        uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release upload "$TAG" "$DEB_PATH" --clobber
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ env.DEB_PATH }}
+          asset_name: ${{ env.DEB_NAME }}
+          asset_content_type: application/vnd.debian.binary-package
 
       - name: Upload checksums
+        uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release upload "$TAG" dist/SHA256SUMS.txt --clobber
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: dist/SHA256SUMS.txt
+          asset_name: SHA256SUMS.txt
+          asset_content_type: text/plain

@@ -1,7 +1,7 @@
 name: Release code-only
 on:
   push:
-    tags: ["v*"]
+    tags: ["src-v*"]
 permissions:
   contents: write
 jobs:

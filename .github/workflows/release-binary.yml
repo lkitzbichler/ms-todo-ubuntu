@@ -3,10 +3,10 @@ name: Release binary (.deb)
 on:
   push:
     tags:
-      - "v*"    # z.B. v1.0.3
+      - "v*"    # z.B. v1.0.6
 
 permissions:
-  contents: write  # erlaubt Upload an Releases
+  contents: write  # nötig für Release-Erstellung/Upload
 
 jobs:
   build-deb:
@@ -25,7 +25,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # WICHTIG: electron-builder darf NICHT publishen -> --publish never
+      # electron-builder baut, published NICHT selbst
       - name: Build .deb
         run: npx electron-builder --linux deb --publish never
 
@@ -35,12 +35,46 @@ jobs:
           sha256sum *.deb > SHA256SUMS.txt
           ls -lh
 
-      - name: Upload to GitHub Release
-        uses: softprops/action-gh-release@v2
+      # Release automatisch anlegen, falls er noch nicht existiert
+      - name: Ensure release exists (create if missing)
+        id: ensure_release
+        uses: actions/github-script@v7
         with:
-          files: |
-            dist/*.deb
-            dist/SHA256SUMS.txt
-          generate_release_notes: true
+          script: |
+            const tag = context.ref.replace('refs/tags/','');
+            const { owner, repo } = context.repo;
+            try {
+              const rel = await github.rest.repos.getReleaseByTag({ owner, repo, tag });
+              core.info(`Release ${tag} exists (id=${rel.data.id}).`);
+              core.setOutput('id', rel.data.id.toString());
+              core.setOutput('upload_url', rel.data.upload_url);
+            } catch (e) {
+              if (e.status !== 404) throw e;
+              const rel = await github.rest.repos.createRelease({
+                owner, repo, tag_name: tag, name: tag, generate_release_notes: true
+              });
+              core.info(`Created release ${tag} (id=${rel.data.id}).`);
+              core.setOutput('id', rel.data.id.toString());
+              core.setOutput('upload_url', rel.data.upload_url);
+            }
+
+      # Assets hochladen — ohne Release-Metadaten zu ändern
+      - name: Upload .deb
+        uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.ensure_release.outputs.upload_url }}
+          asset_path: dist/ms-todo_${{ github.ref_name.replace('v','') }}_amd64.deb
+          asset_name: ms-todo_${{ github.ref_name.replace('v','') }}_amd64.deb
+          asset_content_type: application/vnd.debian.binary-package
+
+      - name: Upload checksums
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.ensure_release.outputs.upload_url }}
+          asset_path: dist/SHA256SUMS.txt
+          asset_name: SHA256SUMS.txt
+          asset_content_type: text/plain
